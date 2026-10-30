@@ -46,13 +46,28 @@ reboot
 
 ## Ersteinrichtung
 
-Beim ersten Start fuehrt ein Assistent durch die Zuweisung:
+Beim ersten Start fuehrt ein Assistent in **2 Schritten** durch die Zuordnung. Jede Frage steht einzeln auf dem Bildschirm, mit Erklaerung, wofuer das Geraet gebraucht wird.
 
-1. Jeder Monitor zeigt seine Nummer. Ordne Entsperren-, Tuer-auf- und Steuer-Monitor zu.
-2. Zu jedem Detektor werden die Spieler in 6 Bloecken Reichweite angezeigt. Stell dich an eine Seite und weise "Freie Seite" und "Whitelist-Seite" zu.
-3. Relay und Motor werden automatisch gefunden.
+**Schritt 1 - Monitore:** Alle Monitore zeigen blau ihre Nummer (#1, #2 ...). Du gibst fuer jeden an, welche Nummer er hat:
 
-Danach pflegst du alles ueber das Terminal-Menue.
+| Monitor | Aufgabe |
+|---|---|
+| ENTSPERREN | Button der Whitelist-Seite, prueft die Berechtigung |
+| TUER AUF | Innen-Taster, oeffnet ohne Pruefung |
+| STEUERUNG | Modus, Motor, Status und Zugriffslog |
+
+Ein Monitor kann nur einmal vergeben werden. Zugeordnete Monitore zeigen danach gruen ihre Bezeichnung.
+
+**Schritt 2 - Detektoren:** Zu jedem Detektor steht in `[ ]`, welche Spieler er im Umkreis von 6 Bloecken sieht.
+
+| Detektor | Aufgabe |
+|---|---|
+| FREIE SEITE | Seite ohne Whitelist, oeffnet automatisch fuer jeden |
+| WHITELIST-SEITE | Seite mit Whitelist, gehoert zum Button ENTSPERREN |
+
+Stell dich direkt neben den Detektor einer Seite und druecke `r`. Steht dein Name hinter einem Detektor, ist das der richtige.
+
+Relay und Motor werden automatisch gefunden. Danach pflegst du alles ueber das Terminal-Menue.
 
 ## Terminal-Menue
 

@@ -516,22 +516,51 @@ local function askNumber(prompt, current, min, max)
   return math.max(min, math.min(max, v))
 end
 
-local function pickFrom(list, current, info)
-  for i, n in ipairs(list) do
-    local line = " " .. i .. ") " .. n
-    if info then line = line .. "  " .. info(n) end
-    if n == current then line = line .. "  (aktuell)" end
-    print(line)
+-- Nummer waehlen. 'r' laedt die Anzeige neu (fuer Detektor-Info), Enter behaelt den bisherigen Wert.
+-- header() zeichnet vor jedem Durchlauf die Erklaerung, taken verhindert Doppelbelegung.
+local function choose(list, current, info, taken, header)
+  local msg
+  while true do
+    if header then header() end
+    for i, n in ipairs(list) do
+      local line = " " .. i .. ") " .. n
+      if info then line = line .. "  " .. info(n) end
+      if n == current then line = line .. "  <- bisher" end
+      print(line)
+    end
+    print("")
+    if msg then print(msg); msg = nil end
+    write(info and "Nummer eingeben (r = neu laden): " or "Nummer eingeben: ")
+    local input = read()
+    if not (info and input:lower() == "r") then
+      local pick = list[tonumber(input)]
+      if not pick and input == "" then pick = current end
+      if not pick then
+        msg = "Ungueltig - bitte eine Nummer aus der Liste eingeben."
+      elseif taken and taken[pick] then
+        msg = "Schon vergeben an '" .. taken[pick] .. "' - bitte ein anderes."
+      else
+        return pick
+      end
+    end
   end
-  write("Nummer (Enter = behalten): ")
-  local i = tonumber(read())
-  return list[i] or current
+end
+
+local function askSetting(n, total, lines, unit, current, min, max)
+  term.clear(); term.setCursorPos(1, 1)
+  print("== Zeiten und Reichweiten " .. n .. "/" .. total .. " ==")
+  print("(Enter = Wert behalten)")
+  print("")
+  for _, l in ipairs(lines) do print(l) end
+  print("")
+  return askNumber(unit, current, min, max)
 end
 
 local function labelMonitor(name, text)
   local m = peripheral.wrap(name)
   if not m then return end
-  m.setBackgroundColor(colors.black)
+  m.setTextScale(1)
+  m.setBackgroundColor(colors.green)
   m.setTextColor(colors.white)
   m.clear()
   m.setCursorPos(1, 1)
@@ -540,57 +569,138 @@ end
 
 local function assignMonitors()
   local list = listByTypes(MON_TYPES)
-  if #list == 0 then print("Keine Monitore gefunden."); sleep(2); return end
+  if #list < 3 then
+    term.clear(); term.setCursorPos(1, 1)
+    print("Es werden 3 Monitore gebraucht,")
+    print("gefunden: " .. #list)
+    print("")
+    print("Sind alle Monitore ueber Wired Modems")
+    print("mit dem Computer verbunden?")
+    sleep(5)
+    return
+  end
+
+  -- jeder Monitor zeigt gross seine Nummer
   for i, n in ipairs(list) do
     local m = peripheral.wrap(n)
-    m.setTextScale(1)
-    m.setBackgroundColor(colors.black)
+    m.setTextScale(2)
+    m.setBackgroundColor(colors.blue)
     m.setTextColor(colors.white)
     m.clear()
-    m.setCursorPos(1, 1); m.write("#" .. i)
-    m.setCursorPos(1, 2); m.write(n)
+    m.setCursorPos(1, 1)
+    m.write("#" .. i)
   end
-  print("Jeder Monitor zeigt seine Nummer.")
-  print("")
-  print("Monitor ENTSPERREN (Whitelist-Button):")
-  cfg.monitorAuth = pickFrom(list, cfg.monitorAuth)
-  if cfg.monitorAuth then labelMonitor(cfg.monitorAuth, "ENTSPERREN") end
-  print("")
-  print("Monitor TUER AUF (Taster):")
-  cfg.monitorOpen = pickFrom(list, cfg.monitorOpen)
-  if cfg.monitorOpen then labelMonitor(cfg.monitorOpen, "TUER AUF") end
-  print("")
-  print("Monitor STEUERUNG:")
-  cfg.monitorControl = pickFrom(list, cfg.monitorControl)
-  if cfg.monitorControl then labelMonitor(cfg.monitorControl, "STEUERUNG") end
+
+  local steps = {
+    { key = "monitorAuth", title = "ENTSPERREN", text = {
+      "Hier steht der Button ENTSPERREN.",
+      "Er gehoert zur WHITELIST-Seite der Tuer:",
+      "Wer ihn drueckt, wird geprueft. Nur Spieler",
+      "auf der Whitelist kommen durch." } },
+    { key = "monitorOpen", title = "TUER AUF", text = {
+      "Hier steht der Button TUER AUF.",
+      "Er oeffnet die Tuer sofort und OHNE Pruefung",
+      "(Innen-Taster)." } },
+    { key = "monitorControl", title = "STEUERUNG", text = {
+      "Hier stellst du Modus (Automatik / Gesperrt /",
+      "Dauerauf) und Motor ein und siehst Tuerstatus",
+      "und die letzten Zugriffe." } },
+  }
+
+  local taken = {}
+  for idx, st in ipairs(steps) do
+    local function header()
+      term.clear(); term.setCursorPos(1, 1)
+      print("Schritt 1/2 - Monitor " .. idx .. " von 3: " .. st.title)
+      print("")
+      for _, l in ipairs(st.text) do print(l) end
+      print("")
+      print("Die Monitore zeigen blau ihre Nummer (#1, #2 ...).")
+      print("Welche Nummer hat dieser Monitor?")
+      print("")
+    end
+    local pick = choose(list, cfg[st.key], nil, taken, header)
+    cfg[st.key] = pick
+    taken[pick] = st.title
+    labelMonitor(pick, st.title)
+  end
+
   saveSettings()
   applyPeripherals()
   buttons = {}
   invalidate()
+
+  term.clear(); term.setCursorPos(1, 1)
+  print("Monitore gespeichert:")
+  print("")
+  print(" ENTSPERREN = " .. cfg.monitorAuth)
+  print(" TUER AUF   = " .. cfg.monitorOpen)
+  print(" STEUERUNG  = " .. cfg.monitorControl)
+  sleep(3)
 end
 
 local function assignDetectors()
   local list = listByTypes(DET_TYPES)
-  if #list == 0 then print("Keine Player Detectors gefunden."); sleep(2); return end
-  print("Spieler in 6 Bloecken Reichweite je Detektor")
-  print("(stell dich an eine Seite, um sie zuzuordnen):")
-  print("")
+  if #list < 2 then
+    term.clear(); term.setCursorPos(1, 1)
+    print("Es werden 2 Player Detectors gebraucht,")
+    print("gefunden: " .. #list)
+    print("")
+    print("Sind beide ueber Wired Modems mit dem")
+    print("Computer verbunden?")
+    sleep(5)
+    return
+  end
+
   local function info(n)
     local d = peripheral.wrap(n)
     local ok, p = pcall(d.getPlayersInRange, 6)
     if ok and type(p) == "table" and #p > 0 then
       return "[" .. table.concat(p, ", ") .. "]"
     end
-    return "[-]"
+    return "[niemand in 6 Bloecken]"
   end
-  print("Detektor FREIE Seite (oeffnet automatisch fuer jeden):")
-  cfg.detectorFree = pickFrom(list, cfg.detectorFree, info)
-  print("")
-  print("Detektor WHITELIST-Seite (Pruefung per Button):")
-  cfg.detectorWhitelist = pickFrom(list, cfg.detectorWhitelist, info)
+
+  local steps = {
+    { key = "detectorFree", title = "FREIE SEITE", text = {
+      "Die Seite OHNE Whitelist. Dieser Detektor",
+      "oeffnet die Tuer AUTOMATISCH fuer JEDEN",
+      "Spieler, der sich naehert." } },
+    { key = "detectorWhitelist", title = "WHITELIST-SEITE", text = {
+      "Die Seite MIT Whitelist. Dieser Detektor",
+      "gehoert zum Button ENTSPERREN: Nur Spieler",
+      "auf der Whitelist kommen durch." } },
+  }
+
+  local taken = {}
+  for idx, st in ipairs(steps) do
+    local function header()
+      term.clear(); term.setCursorPos(1, 1)
+      print("Schritt 2/2 - Detektor " .. idx .. " von 2: " .. st.title)
+      print("")
+      for _, l in ipairs(st.text) do print(l) end
+      print("")
+      print("So findest du ihn: Stell dich direkt neben")
+      print("diesen Detektor und druecke 'r'. In [ ] stehen")
+      print("die Spieler im Umkreis von 6 Bloecken. Steht")
+      print("dein Name dort, ist er es.")
+      print("")
+    end
+    local pick = choose(list, cfg[st.key], info, taken, header)
+    cfg[st.key] = pick
+    taken[pick] = st.title
+  end
+
   saveSettings()
   applyPeripherals()
   invalidate()
+
+  term.clear(); term.setCursorPos(1, 1)
+  print("Detektoren gespeichert:")
+  print("")
+  print(" FREIE SEITE      = " .. cfg.detectorFree)
+  print(" WHITELIST-SEITE  = " .. cfg.detectorWhitelist)
+  sleep(3)
 end
 
 local function whitelistMenu()
@@ -620,9 +730,14 @@ local function whitelistMenu()
 end
 
 local function relayMenu()
-  print("Aktive Seiten: " .. table.concat(cfg.relaySides, " "))
+  print("== Relay ==")
+  print("")
+  print("An welchen Seiten des Redstone Relays liegt das")
+  print("Tuer-Signal an? Seiten mit Leerzeichen trennen,")
+  print("oder 'alle' fuer alle 6 Seiten.")
+  print("")
   print("Verfuegbar: " .. table.concat(ALL_SIDES, " "))
-  local s = ask("Seiten (Leerzeichen getrennt, 'alle'): ", table.concat(cfg.relaySides, " "))
+  local s = ask("Seiten: ", table.concat(cfg.relaySides, " "))
   local sides = {}
   if s:lower() == "alle" then
     sides = { table.unpack(ALL_SIDES) }
@@ -634,7 +749,10 @@ local function relayMenu()
     end
   end
   if #sides > 0 then cfg.relaySides = sides end
-  local inv = ask("Signal invertieren? (j/n): ", cfg.relayInvert and "j" or "n")
+  print("")
+  print("Normal:      Tuer offen = Redstone-Signal AN")
+  print("Invertiert:  Tuer offen = Redstone-Signal AUS")
+  local inv = ask("Invertieren? (j/n): ", cfg.relayInvert and "j" or "n")
   cfg.relayInvert = (inv:lower() == "j")
   saveSettings()
   writeDoor(state.doorOpen)
@@ -683,13 +801,13 @@ local function menu()
     term.clear(); term.setCursorPos(1, 1)
     print("== Tuersteuerung ==")
     print("1) Whitelist verwalten")
-    print("2) Detektoren zuweisen")
+    print("2) Detektoren zuweisen (frei / Whitelist)")
     print("3) Monitore zuweisen")
     print("4) Motor-RPM (" .. math.abs(cfg.motorRpm) .. ")")
     print("5) Zeiten/Reichweiten (offen " .. cfg.openTime .. "s)")
     print("6) Relay-Seiten (" .. #cfg.relaySides .. " aktiv, invert: "
       .. (cfg.relayInvert and "ja" or "nein") .. ")")
-    print("7) Auto-Oeffnen Whitelist-Seite: "
+    print("7) Whitelist-Seite oeffnet auch automatisch: "
       .. (cfg.whitelistSideAuto and "AN" or "AUS"))
     print("8) Diagnose (Detektoren live)")
     write("> ")
@@ -701,16 +819,40 @@ local function menu()
     elseif c == "3" then
       term.clear(); term.setCursorPos(1, 1); assignMonitors()
     elseif c == "4" then
+      term.clear(); term.setCursorPos(1, 1)
+      print("== Motor-Drehzahl ==")
+      print("(Enter = Wert behalten)")
+      print("")
+      print("Mit welcher Drehzahl laeuft der Motor,")
+      print("wenn er auf AN steht? (Drehrichtung ist fest)")
+      print("")
       cfg.motorRpm = askNumber("RPM", math.abs(cfg.motorRpm), 1, 256)
       saveSettings()
       if state.motorOn then setMotor(true) end
       invalidate()
     elseif c == "5" then
-      cfg.openTime = askNumber("Sekunden offen", cfg.openTime, 1, 120)
-      cfg.freeRange = askNumber("Reichweite freie Seite (Bloecke)", cfg.freeRange, 1, 64)
-      cfg.whitelistRange = askNumber("Reichweite Whitelist-Seite (Bloecke)", cfg.whitelistRange, 1, 64)
-      cfg.holdRange = askNumber("Halte-Radius: Tuer bleibt offen (Bloecke)", cfg.holdRange, 1, 8)
-      cfg.feedbackTime = askNumber("Rueckmeldung auf Monitor (Sek.)", cfg.feedbackTime, 1, 30)
+      cfg.openTime = askSetting(1, 5, {
+        "Wie lange bleibt die Tuer nach der letzten",
+        "Erkennung bzw. nach einem Button-Druck offen?" },
+        "Sekunden", cfg.openTime, 1, 120)
+      cfg.freeRange = askSetting(2, 5, {
+        "FREIE Seite: Bis zu welcher Entfernung zum",
+        "Detektor oeffnet die Tuer automatisch?" },
+        "Bloecke", cfg.freeRange, 1, 64)
+      cfg.whitelistRange = askSetting(3, 5, {
+        "WHITELIST-Seite: Bis zu welcher Entfernung",
+        "zum Detektor zaehlt ein Spieler beim Druck",
+        "auf ENTSPERREN?" },
+        "Bloecke", cfg.whitelistRange, 1, 64)
+      cfg.holdRange = askSetting(4, 5, {
+        "Halte-Radius: Solange ein Spieler so nah an",
+        "einem der beiden Detektoren steht, schliesst",
+        "die Tuer NICHT (klein halten, z.B. 2)." },
+        "Bloecke", cfg.holdRange, 1, 8)
+      cfg.feedbackTime = askSetting(5, 5, {
+        "Wie lange zeigt der ENTSPERREN-Monitor die",
+        "gruene/rote Rueckmeldung an?" },
+        "Sekunden", cfg.feedbackTime, 1, 30)
       saveSettings()
     elseif c == "6" then
       term.clear(); term.setCursorPos(1, 1); relayMenu()
@@ -770,8 +912,19 @@ if not setupComplete() then
   term.clear(); term.setCursorPos(1, 1)
   print("== Ersteinrichtung ==")
   print("")
-  assignMonitors()
+  print("Benoetigt, alles ueber Wired Modems am Computer:")
+  print(" - 3 Monitore")
+  print(" - 2 Player Detectors")
+  print(" - 1 Redstone Relay (Tuer-Signal)")
+  print(" - optional 1 Electric Motor")
   print("")
+  print("Es folgen 2 Schritte:")
+  print(" 1) Monitore zuordnen")
+  print(" 2) Detektoren zuordnen")
+  print("")
+  write("Weiter mit Enter ")
+  read()
+  assignMonitors()
   assignDetectors()
   if not setupComplete() then
     error("Einrichtung unvollstaendig - Programm neu starten", 0)
