@@ -2,7 +2,7 @@
 
 Tuersteuerung fuer **CC:Tweaked** (Minecraft, ATM10 / 1.21.x) mit Berechtigungspruefung per Player Detector, drei Monitoren und optionalem Motor.
 
-> **Status:** In Entwicklung. Die Syntax ist geprueft, ein vollstaendiger Test im Spiel steht noch aus.
+> **Status:** Im Spiel getestet (ATM10 / 1.21.x).
 
 ## Funktionen
 
@@ -44,6 +44,14 @@ reboot
 
 (Falls der Download blockiert ist, `door.lua` per Pastebin oder Diskette uebertragen.)
 
+**Aktualisieren:** Datei loeschen und neu laden. Einstellungen und Whitelist bleiben erhalten, weil sie in eigenen Dateien liegen.
+
+```
+delete startup.lua
+wget https://raw.githubusercontent.com/ItIsYe/CC-Tuersteuerung/main/door.lua startup.lua
+reboot
+```
+
 ## Ersteinrichtung
 
 Beim ersten Start fuehrt ein Assistent in **2 Schritten** durch die Zuordnung. Jede Frage steht einzeln auf dem Bildschirm, mit Erklaerung, wofuer das Geraet gebraucht wird.
@@ -74,13 +82,28 @@ Relay und Motor werden automatisch gefunden. Danach pflegst du alles ueber das T
 | Punkt | Inhalt |
 |---|---|
 | 1 | Whitelist verwalten (`add <name>`, `remove <name>`) |
-| 2 | Detektoren zuweisen |
-| 3 | Monitore zuweisen |
+| 2 | Detektoren zuweisen (Freie Seite / Whitelist-Seite) |
+| 3 | Monitore zuweisen (Entsperren / Tuer auf / Steuerung) |
 | 4 | Motor-RPM (1-256) |
 | 5 | Zeiten und Reichweiten (Offenzeit, Radien, Halte-Radius, Rueckmeldung) |
 | 6 | Relay-Seiten und Invertierung |
 | 7 | Auto-Oeffnen auch auf der Whitelist-Seite (fuer Whitelist-Spieler) |
 | 8 | Diagnose: zeigt live, welche Spieler jeder Detektor sieht |
+
+## Standardwerte
+
+Alle Werte lassen sich im Terminal-Menue aendern.
+
+| Einstellung | Standard |
+|---|---|
+| Tuer offen nach letzter Erkennung | 5 Sekunden |
+| Reichweite Freie Seite | 4 Bloecke |
+| Reichweite Whitelist-Seite | 3 Bloecke |
+| Halte-Radius (Tuer schliesst nicht) | 2 Bloecke |
+| Rueckmeldung auf dem Entsperren-Monitor | 3 Sekunden |
+| Motor-Drehzahl | 32 RPM |
+| Relay-Seiten | alle 6, Signal AN = Tuer offen |
+| Auto-Oeffnen Whitelist-Seite | aus |
 
 ## Funktionsweise
 
